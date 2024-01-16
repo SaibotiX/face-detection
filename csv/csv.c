@@ -9,11 +9,11 @@
 
 int main(int argc, char *argv[])
 {
+	flags flag = initialize_flags();
+	split = initialize_split();
+	buffer = malloc(sizeof(char) * 20);
 	while (1)
 	{
-
-		flags flag = initialize_flags();
-
 		int c = getopt_long(argc, argv, "w::s:c:r:l::", long_options, &option_index);
 
 		if(c == -1)
@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 			{
 				flag.w_flag = 1;		
 				
-				check_general_optarg(optarg);
+				check_general_optarg(optarg, 'w');
 
 				input_file_name = optarg ? &optarg[1] : default_file_name;	
 				break;
@@ -37,9 +37,9 @@ int main(int argc, char *argv[])
 			{
 				flag.s_flag = 1;
 
-				check_general_optarg(optarg);
+				check_general_optarg(optarg, 's');
 
-				input_file_name = optarg;	
+				input_file_name = &optarg[1];	
 				break;
 			}
 
@@ -47,10 +47,10 @@ int main(int argc, char *argv[])
 			{
 				flag.c_flag = 1;
 
-				check_columns(optarg);
+				check_columns(optarg, master_current, 'c');
 
-				i_column_l = atoi(&optarg[1]);
-				i_column_r = atoi(&optarg[parse + 1]);
+				split.column_l = atoi(&optarg[1]);
+				split.column_r = atoi(&optarg[parse + 1]);
 				break;
 			}
 
@@ -58,10 +58,10 @@ int main(int argc, char *argv[])
 			{	
 				flag.r_flag = 1;
 
-				check_rows(optarg);
+				check_rows(optarg, master_current, 'r');
 
-				i_row_l = atoi(&optarg[1]);
-				i_row_r = atoi(&optarg[parse + 1]);
+				split.row_l = atoi(&optarg[1]);
+				split.row_r = atoi(&optarg[parse + 1]);
 
 				break;
 			}
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 			{	
 				flag.l_flag = 1;
 				
-				check_general_optarg(optarg);
+				check_general_optarg(optarg, 'l');
 
 				log_file_name = optarg ? &optarg[1] : "csv.log";
 				break;
@@ -89,12 +89,19 @@ int main(int argc, char *argv[])
 			}
 		}
 	}
-
 	excess_arguments(optind, argc);
-	
 	check_read_OR_write(flag);
-	
-	implement_write(flag, input_file_name, default_file_name);
+/*-----------------------------------------------------------*/	
+	set_up_write(flag, input_file_name, default_file_name, master_current);		/*Check correct usage '-w'*/
+																				/*&&*/
+	implement_write(columns, rows, &inptr, master_current);						/*Implementing it*/
+/*-----------------------------------------------------------*/
+
+/*-----------------------------------------------------------*/	
+	set_up_scan(flag, input_file_name, master_current);							/*Check correct usage '-s'*/
+																				/*&&*/
+	implement_scan(split, &inptr, master_current);								/*Implementing it*/
+/*-----------------------------------------------------------*/
 
 	return 0;
 }
