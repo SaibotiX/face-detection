@@ -4,7 +4,9 @@ Short instruction on how to use it:
 
 1. Create a .c File.
 
-2. Include the csv.h file with #include "csv.h" with the parameters "argv" and "argc" Should look like: csv_function(argc, argv);
+2. Include the csv.h file with #include "csv.h" with the parameters "argv" and "argc" Should look like: csvfunction(argc, argv); (Between the csv[here]function should be a "_" it didnt allow me to write it there)
+
+The output of the function is a "node **" That means you gotta define a variable with that data structure and store it in there. 
 
 3. Now compile your .c File with gcc -o main [Your Filename]
 

@@ -7,7 +7,7 @@
 
 #include "functions.h"
 
-int csv_function(int argc, char *argv[])
+node ** csv_function(int argc, char *argv[])
 {
 	flags flag = initialize_flags();
 	split = initialize_split();
@@ -52,9 +52,6 @@ int csv_function(int argc, char *argv[])
 				flag.c_flag = 1;
 
 				check_columns(optarg, master_current, 'c');
-
-				split.column_l = atoi(&optarg[1]);
-				split.column_r = atoi(&optarg[parse + 1]);
 				break;
 			}
 
@@ -63,10 +60,6 @@ int csv_function(int argc, char *argv[])
 				flag.r_flag = 1;
 
 				check_rows(optarg, master_current, 'r');
-
-				split.row_l = atoi(&optarg[1]);
-				split.row_r = atoi(&optarg[parse + 1]);
-
 				break;
 			}
 			case 0:
@@ -89,13 +82,12 @@ int csv_function(int argc, char *argv[])
 	/*-----------------------------------------------------------*/	
 		set_up_scan(flag, input_file_name, master_current);							/*Check correct usage '-s'*/
 																					/*&&*/
-		implement_scan(split, &inptr, master_current);								/*Implementing it*/
+		return implement_scan(split, flag, &inptr, master_current);								/*Implementing it*/
 	/*-----------------------------------------------------------*/
-		return 0;
 	}
 	else
 	{
 		print_error(69);
-		return 1;
+		exit(1);
 	}
 }
