@@ -17,12 +17,9 @@ A few options are available:
 -w= [For writing a .csv file]
 
 -c= [For specifying the columns you want to write or scan (read a .csv file)]
-combined with [-s] you can specifiy where to start and end scanning with the syntax: -c=[from]:[to]
+combined with [-s] you can specifiy where to start and end scanning with the syntax: -c=[input from]:[input to]:[result].
 
 -r= [For specifying the rows you want to write or scan]
-combined with [-s] you can specifiy where to start and end scanning with the syntax: -r=[from]:[to]
+combined with [-s] you can specifiy where to start and end scanning with the syntax: -r=[input from]:[input to]:[result]
 
 Further implementations will be made if at least one demand is out there. Else I will just use it myself.
-
-The implementations would be: [-h] for an inbuilt helper and the possibility to use the long arguments as -write and more which I do not know now. 
-

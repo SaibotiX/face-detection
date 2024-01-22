@@ -7,7 +7,7 @@
 
 #include "functions.h"
 
-node ** csv_function(int argc, char *argv[])
+result csv_function(int argc, char *argv[])
 {
 	flags flag = initialize_flags();
 	split = initialize_split();
@@ -66,6 +66,10 @@ node ** csv_function(int argc, char *argv[])
 			{
 				/* Usage long name will get handled here */
 				break;
+			}
+			case '?':
+			{
+				exit(1);
 			}
 		}
 	}
