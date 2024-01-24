@@ -3,6 +3,11 @@
 
 #define MAX 20
 
+FILE *inptr = NULL;
+char *buffer;
+int array_count = 0;
+
+/* Tracking and then verifying which Arguments the user used */
 typedef struct {
 	int w_flag;
 	int s_flag;
@@ -13,6 +18,7 @@ typedef struct {
 
 flags flag;
 
+/* This struct is used to decompose the -r= and -c= values like: 12:14:15 */
 typedef struct {
 	int column_l;
 	int column_m;
@@ -23,18 +29,24 @@ typedef struct {
 	int row_r;
 } splits;
 
-splits split;
+typedef struct {
+	int column;
+	int row;
+}layout;
 
+/* This node gets used to store the inputs and the output value of the csv file */
 typedef struct node {
 	int input;
 	struct node *next;
 } node;
 
+/* This type gets returned in order to use the result elsewhere */
 typedef struct {
 	node **input;
 	node **output;
 } result;
 
+/* This is needed for the getopt() function */
 static struct option long_options[] = {
 	{"write", optional_argument, &flag.w_flag, 1},
 	{"scan", required_argument, &flag.s_flag, 1},
@@ -42,24 +54,6 @@ static struct option long_options[] = {
 	{"rows", required_argument, &flag.r_flag, 1},
 	{0,0,0,0}
 };
-
-int rows = 0;
-int columns = 0;
-int len = 0, option_index = 0, parse[2], twice = 0;
-int tmp = 0;
-int node_iteration = 0;
-int array_count = 0, count = 0;
-
-char *input_file_name = NULL;
-char *default_file_name = "document.csv";
-char *buffer = NULL;
-
-char master_current = 0; /*Check if it is [-w] or [-s]*/
-char c = 0; /*iterating in fread*/
-
-bool check_functionality = true;
-
-FILE *inptr = NULL;
 
 flags initialize_flags(void) {
 	flags flag;
@@ -84,7 +78,6 @@ splits initialize_split(void) {
 
 void print_error(int error_number) 
 {
-	check_functionality = false;
 	printf("Help = '-h'\n");
 
 	switch(error_number) {
@@ -114,10 +107,6 @@ void print_error(int error_number)
 		}
 		case 8: {
 			printf("Could not open file\n");
-			break;
-		}
-		case 9: {
-			printf("No ':' allowed with the option '-w'\n");
 			break;
 		}
 		case 10: {
@@ -156,19 +145,20 @@ void print_error(int error_number)
 			printf("Make sure your Arguments are set correctly. Numbers for -c -r for write only!\n");
 			break;
 		}
+		case 19: {
+			printf("Make sure your columns and rows are from lowest to highest.\n");
+			break;
+		}
 		case 69: {
 			/* Nothing happens, except the first notification */
 			break;
 		}
 	}
+	exit(1);
 }
 
-void check_general_optarg(char *optarg, char option)
+void check_general_optarg(char *optarg, char identifier)
 {
-	if (option == 's' || option == 'w') {
-		master_current = option;
-	}
-
 	if(optarg != NULL) {
 			if(optarg[0] != '=') {
 				print_error(1);
@@ -179,101 +169,103 @@ void check_general_optarg(char *optarg, char option)
 				exit(1);
 			}
 		}
-
-	switch (option) {
-		case 's': {
-			if (optarg == NULL) {
-				print_error(6);
-				exit(1);
-			}
-		}
-	}
-
-}
-
-void check_int_semicolon_optarg(char *optarg, char master_current, char option)
-{
-	twice = 0;
-	if (master_current == 's') {
-	for (int i = 1, n = strlen(optarg); i < n; i = i + 1) {
-			if (!isdigit(optarg[i]) && optarg[i] != ':') {
-				print_error(3);
-				exit(1);
-			}
-			else if(optarg[i] == ':') {
-				if(twice > 2) {
-					print_error(14);
-					exit(1);
-				}
-
-				parse[twice] = i;
-				twice = twice + 1;
-				optarg[i] == '\0';
-			}
-		}
-		if (twice == 2) {
-			if (option == 'r') {
-				split.row_l = atoi(&optarg[1]);
-				split.row_m = atoi(&optarg[parse[0] + 1]);
-				split.row_r = atoi(&optarg[parse[1] + 1]);
-			}
-			else if (option == 'c') {
-				split.column_l = atoi(&optarg[1]);
-				split.column_m = atoi(&optarg[parse[0] + 1]);
-				split.column_r = atoi(&optarg[parse[1] + 1]);
-			}
-		}
-		else {
-			print_error(14);
-			exit(1);
-		}
-	}
-	else if(option == 'c') {
-		if (!atoi(&optarg[1])) {
-				print_error(18);
-				exit(1);
-		}
-		columns = atoi(&optarg[1]);
-	}
-	else if(option == 'r') {
-		if (!atoi(&optarg[1])) {
-				print_error(18);
-				exit(1);
-		}
-		rows = atoi(&optarg[1]);
-	}
-}
-
-void check_master_current(char master_current)
-{
-	if (master_current == 0) {
-		print_error(12);
+	else if(identifier != 's' && optarg == NULL)
+	{
+		print_error(6);
 		exit(1);
 	}
 }
 
-void check_columns(char *optarg, char master_current, char option)
+void initialize_master_current(char *master_current, char c)
 {
-	check_master_current(master_current);
-
-	check_general_optarg(optarg, option);
-
-	check_int_semicolon_optarg(optarg, master_current, option);
+	if(*master_current == 0) {
+		*master_current = c;
+	}
+	else {
+		print_error(5);
+		exit(1);
+	}
 }
 
-void check_rows(char *optarg, char master_current, char option)
+/* Make it so the scan and the write uses different functions because it does not work like I intendet! */
+
+int * track_semicolons(void)
 {
-	check_master_current(master_current);
+	int twice = 0;
+	int *position_semicolon = malloc(sizeof(int) * 2);
+	position_semicolon[0] = 0;
+	position_semicolon[1] = 0;
 
-	check_general_optarg(optarg, option);
+	for (int i = 1, n = strlen(optarg); i < n; i = i + 1) {
+		if (!isdigit(optarg[i]) && optarg[i] != ':') {
+			print_error(3);
+			exit(1);
+		}
+		else if(optarg[i] == ':') {
+			if(twice > 2) {
+				print_error(14);
+				exit(1);
+			}
 
-	check_int_semicolon_optarg(optarg, master_current, option);
+			position_semicolon[twice] = i;
+			twice = twice + 1;
+			optarg[i] == '\0';
+		}
+	}
+	return position_semicolon;
+}
+
+void define_split(char *optarg, splits *split, char identifier, int *position_semicolons)
+{
+	if(position_semicolons[0] == 0 || position_semicolons[1] == 0) {
+		print_error(14);
+		exit(1);
+	}
+
+	if (identifier == 'r') {
+		split->row_l = atoi(&optarg[1]);
+		split->row_m = atoi(&optarg[position_semicolons[0] + 1]);
+		split->row_r = atoi(&optarg[position_semicolons[1] + 1]);
+	}
+	else if (identifier == 'c') {
+		split->column_l = atoi(&optarg[1]);
+		split->column_m = atoi(&optarg[position_semicolons[0] + 1]);
+		split->column_r = atoi(&optarg[position_semicolons[1] + 1]);
+	}
+	free(position_semicolons);
+}
+
+void define_table(layout *table, char identifier)
+{
+	if(identifier == 'c') {
+		if (!atoi(&optarg[1])) {
+			print_error(18);
+			exit(1);
+		}
+		table->column = atoi(&optarg[1]);
+	}
+	else if(identifier == 'r') {
+		if (!atoi(&optarg[1])) {
+				print_error(18);
+				exit(1);
+		}
+		table->row = atoi(&optarg[1]);
+	}
 }
 
 void excess_arguments(int optind, int argc)
 {
 	if(optind < argc) {
 		print_error(17);
+		exit(1);
+	}
+}
+
+/* ------------------------------------------------------- */
+void check_master_current(char master_current)
+{
+	if (master_current == 0) {
+		print_error(12);
 		exit(1);
 	}
 }
@@ -304,6 +296,20 @@ void check_memory(char *alloced_char)
 	}
 }
 
+void check_split(splits split)
+{
+	if (split.column_l > split.column_m || split.column_l > split.column_r || split.column_m > split.column_r) {
+		print_error(19);
+		exit(1);
+	}
+	else if(split.row_l > split.row_m || split.row_m > split.row_r || split.row_m > split.row_r) {
+		print_error(19);
+		exit(1);
+	}
+}
+/* ----------------------------------------------------------*/
+
+/* ---------------------------------------------------------------*/
 void free_node(node *root)
 {
 	if(root == NULL) {
@@ -315,19 +321,35 @@ void free_node(node *root)
 	free(root);
 }
 
-void free_input(node **root, node **output, int array_count, char *buffer, FILE **inptr)
+void free_input(node **input)
 {
 	for(int i = 0; i < array_count; i = i + 1) {
-		free_node(root[i]);
+		free_node(input[i]);
 	}
-	free(root);
-	free_node(output[0]);
-	free(output);
-
-	free(buffer);
-	fclose(*inptr);
+	free(input);
 }
 
+void free_output(node **output)
+{
+	free_node(output[0]);
+	free(output);
+}
+
+void free_everything_else(FILE *inptr,char *buffer)
+{
+	free(buffer);
+	fclose(inptr);
+}
+
+void call_free_functions(result csv, char *buffer)
+{
+	free_input(csv.input);
+	free_output(csv.output);
+	free_everything_else(inptr, buffer);
+}
+/* ----------------------------------------------------------------- */
+
+/* ----------------------------------------------------------------------------------------------------- */
 void set_up_write(flags flag, char *input_file_name, char *default_file_name, char current)
 {
 	if (current == 'w') {
@@ -342,10 +364,6 @@ void set_up_write(flags flag, char *input_file_name, char *default_file_name, ch
 
 				 check_file(inptr);
 			}
-			if (twice == 1) {
-				print_error(9);
-				exit(1);
-			}
 		}
 		else {
 			print_error(7);
@@ -354,57 +372,59 @@ void set_up_write(flags flag, char *input_file_name, char *default_file_name, ch
 	}
 }
 
-void implement_write(int columns, int rows, FILE **inptr, char current)
+void implement_write(layout table, char master_current)
 {		
-	if (current == 'w') {
-		buffer = malloc(sizeof(char) * 20);
-		char *arr_column[rows][columns];
+	if (master_current == 'w') {
+		char *buffer = malloc(sizeof(char) * 20);
+		char *arr_column[table.row][table.column];
 
-		for (int i = 0; i < rows; i = i + 1) {
-			for (int j = 0; j < columns; j = j + 1) {
+		for (int i = 0; i < table.row; i = i + 1) {
+			for (int j = 0; j < table.column; j = j + 1) {
 				arr_column[i][j] = malloc(sizeof(char) * 20);
 				check_memory(arr_column[i][j]);
 			}
 		}
 
-		for(int i = 0, n = columns; i < n; i = i + 1) {
+		for(int i = 0, n = table.column; i < n; i = i + 1) {
 			printf("COLUMN name %i: ", i);
 			scanf("%0" STR(MAX) "s", buffer);
-			fputs(buffer, *inptr);
-			fputc(',', *inptr);
+			fputs(buffer, inptr);
+			fputc(',', inptr);
 
 			strcpy(arr_column[0][i], buffer);
 		}
 
-		fputc('\n', *inptr);
+		fputc('\n', inptr);
 
-		for(int i = 0, k = rows; i < k; i = i + 1) {
-			for(int j = 0, n = columns; j < n; j = j + 1) {
+		for(int i = 0, k = table.row; i < k; i = i + 1) {
+			for(int j = 0, n = table.column; j < n; j = j + 1) {
 				printf("Value %i %s: ", i + 1, arr_column[0][j]);
 				scanf("%0" STR(MAX) "s", buffer);
-				fputs(buffer, *inptr);
-				putc(',', *inptr);
+				fputs(buffer, inptr);
+				putc(',', inptr);
 			}
 
-			fputc('\n', *inptr);
+			fputc('\n', inptr);
 		}
 
 		free(buffer);
 
-		for(int i = 0; i < rows; i = i + 1) {
-			for(int j = 0; j < columns; j = j + 1) {
+		for(int i = 0; i < table.row; i = i + 1) {
+			for(int j = 0; j < table.column; j = j + 1) {
 				free(arr_column[i][j]);
 			}
 		}	
 
-		fclose(*inptr);
+		fclose(inptr);
 		exit(0);
 	}
 }
+/* ---------------------------------------------------------------------------------------------------------- */
 
-void set_up_scan(flags flag, char *input_file_name, char current)
+
+void set_up_scan(flags flag, char *input_file_name, char master_current)
 {
-	if (current == 's') {
+	if (master_current == 's') {
 		if (flag.s_flag == 1 && flag.r_flag == 1 && flag.c_flag == 1) {
 			inptr = fopen(input_file_name, "r");
 			
@@ -414,107 +434,105 @@ void set_up_scan(flags flag, char *input_file_name, char current)
 			print_error(10);
 			exit(1);
 		}
-		
-		if (split.row_l > split.row_r || split.column_l > split.column_r) {
-			print_error(13);
-			exit(1);
-		}
 	}
 }
 
-void read_char(FILE **inptr, node **root, node **output, int tmp, int c, int count)
+void read_char(result csv, char *buffer)
 {
-	tmp = 0;
-	c = 0;
-	count = 0;
+	int tmp = 0, c = 0, count = 0;
+
 	while(c != ',') {
 		count = count + 1;
 		if (count > 50) {
 			print_error(16);
-			free_input(root, output, array_count, buffer, inptr);
+
+			call_free_functions(csv, buffer);
 			exit(1);
 		}
-		fread(&c, sizeof(char), 1, *inptr);
+		fread(&c, sizeof(char), 1, inptr);
 		buffer[tmp] = c;
 		tmp = tmp + 1;
 	}
 	buffer[tmp - 1] = '\0';
 }
 
-/*Careful one time root == input && output == input and one time is root == output && output == output!! */
-void create_node(FILE **inptr, node **root, node **output, char *buffer, splits split, int array_count, int *node_iteration, char identifier)
+void check_input_value(char * buffer, result csv)
 {
 	if (!atoi(buffer)) {
-			print_error(15);
+		call_free_functions(csv, buffer);
 
-			if(identifier == 'y') {
-				free_input(root, output, array_count, buffer, inptr);
-			}
-			else {
-				free_input(output, root, array_count, buffer, inptr);
-			}
-
-			exit(1);
-		}
-		node *new_node = malloc(sizeof(node));
-		new_node->input = atoi(buffer);
-		new_node->next = root[*node_iteration];
-		root[*node_iteration] = new_node;
-		if (split.column_l != split.column_m && split.row_l != split.row_m && identifier == 'y') {
-			*node_iteration = *node_iteration + 1;
-		}
+		print_error(15);
+		exit(1);
+	}
 }
 
-node ** read_file_input_output(FILE **inptr, node **root, node **output, splits split)
+void create_nodes(node **linked_list, result csv, char *buffer, int node_iteration)
 {
+	check_input_value(buffer, csv);
+
+	node *new_node = malloc(sizeof(node));
+	new_node->input = atoi(buffer);
+	new_node->next = linked_list[node_iteration];
+	linked_list[node_iteration] = new_node;
+}
+
+void read_file_input_output(result csv, splits split)
+{
+	int tmp = 0;
+	int node_iteration = 0;
 	buffer = malloc(sizeof(char) * 50);
-	tmp = 0;
 	for (int i = 0, n = split.row_m; i < n; i = i + 1) {
 		node_iteration = 0;
 		for (int j = 0, m = split.column_m; j < m; j = j + 1) {
-			read_char(inptr, root, output, tmp, c, count);
+			read_char(csv, buffer);
 
 			if (i >= split.row_l - 1 && j >= split.column_l - 1) {
-				create_node(inptr, root, output, buffer, split, array_count, &node_iteration, 'y');
+				create_nodes(csv.input, csv, buffer, node_iteration);
+				node_iteration = node_iteration + 1; 
 			}
 		}
 
 		node_iteration = 0;
 
 		for(int l = 0, p = split.column_r - split.column_m; l < p; l = l + 1) {
-			read_char(inptr, root, output, tmp, c, count);
-
-			/* The value of the output should now match the same line as input check!!! */
+			read_char(csv, buffer);
 
 			if(l == p - 1 && i >= split.row_l - 1) {
-				create_node(inptr, output, root, buffer, split, array_count, &node_iteration, 'n');
+				create_nodes(csv.output, csv, buffer, 0);
 			}
 		}
-		while(tmp = fgetc(*inptr) != 10); /*Jump to next Line*/
+		while(tmp = fgetc(inptr) != 10); /*Jump to next Line*/
 
 	}
-	return root;
 }
 
-result implement_scan(splits split, flags flag, FILE **inptr, int master_current)
+result initialize_result(splits split)
 {
-	if (twice == 2) {
-		result csv;
-		csv.input = malloc(sizeof(node) * split.column_m);
-		csv.output = malloc(sizeof(node));
-		csv.output[0] = malloc(sizeof(node));
-		csv.output[0]->input = 0;
-		csv.output[0]->next = NULL;
-		array_count = split.column_m - split.column_l + 1;
+	result csv;
+	csv.output = malloc(sizeof(node));
+	csv.output[0] = malloc(sizeof(node));
+	csv.output[0]->input = 0;
+	csv.output[0]->next = NULL;
 
-		for (int i = 0; i < array_count; i = i + 1) {
+	csv.input = malloc(sizeof(node) * array_count);
+	for (int i = 0; i < array_count; i = i + 1) {
 		csv.input[i] = malloc(sizeof(node));
 		csv.input[i]->input = 0;
 		csv.input[i]->next = NULL;
-		}
+	}
+	return csv;
+}
 
-		read_file_input_output(inptr, csv.input, csv.output, split); return csv;
+result implement_scan(splits split, char master_current)
+{
+	if (master_current = 's') {
+		array_count = split.column_m - split.column_l + 1;
 
+		result csv = initialize_result(split);
+
+		read_file_input_output(csv, split); 
+		
+		return csv;
 	}
 }
 

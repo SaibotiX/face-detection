@@ -9,8 +9,23 @@
 
 result csv_function(int argc, char *argv[])
 {
-	flags flag = initialize_flags();
-	split = initialize_split();
+	/* Global Variables */
+	buffer = NULL;
+	flag = initialize_flags();
+
+	/* Local Variables */
+	bool check_functionality = true;
+
+	char *input_file_name = NULL;
+	char *default_file_name = "document.csv";
+	
+	char master_current = 0;
+
+	int option_index = 0;
+
+	splits split = initialize_split();
+	layout table;
+
 	while (1)
 	{
 		int c = getopt_long(argc, argv, "w::s:c:r:l::", long_options, &option_index);
@@ -29,7 +44,9 @@ result csv_function(int argc, char *argv[])
 		{
 			case 'w':
 			{
-				flag.w_flag = 1;		
+				initialize_master_current(&master_current, 'w');
+
+				flag.w_flag = 1;
 				
 				check_general_optarg(optarg, 'w');
 
@@ -39,6 +56,8 @@ result csv_function(int argc, char *argv[])
 
 			case 's':
 			{
+				initialize_master_current(&master_current, 's');
+
 				flag.s_flag = 1;
 
 				check_general_optarg(optarg, 's');
@@ -51,7 +70,17 @@ result csv_function(int argc, char *argv[])
 			{
 				flag.c_flag = 1;
 
-				check_columns(optarg, master_current, 'c');
+				check_master_current(master_current);
+
+				check_general_optarg(optarg, 'c');
+
+				if(master_current == 's') {
+					int *position_semicolons = track_semicolons();
+					define_split(optarg, &split, 'c', position_semicolons);
+				}
+				else if(master_current == 'w') {
+					define_table(&table, 'c');
+				}
 				break;
 			}
 
@@ -59,7 +88,17 @@ result csv_function(int argc, char *argv[])
 			{	
 				flag.r_flag = 1;
 
-				check_rows(optarg, master_current, 'r');
+				check_master_current(master_current);
+
+				check_general_optarg(optarg, 'r');
+
+				if(master_current == 's') {
+					int *position_semicolons = track_semicolons();
+					define_split(optarg, &split, 'r', position_semicolons);
+				}
+				else if(master_current == 'w') {
+					define_table(&table, 'r');
+				}
 				break;
 			}
 			case 0:
@@ -76,17 +115,18 @@ result csv_function(int argc, char *argv[])
 	if (check_functionality == true && argc >= 1)
 	{
 		excess_arguments(optind, argc);
+		check_split(split);
 		check_read_OR_write(flag);
 	/*-----------------------------------------------------------*/	
 		set_up_write(flag, input_file_name, default_file_name, master_current);		/*Check correct usage '-w'*/
 																					/*&&*/
-		implement_write(columns, rows, &inptr, master_current);						/*Implementing it*/
+		implement_write(table, master_current);						/*Implementing it*/
 	/*-----------------------------------------------------------*/
 
 	/*-----------------------------------------------------------*/	
 		set_up_scan(flag, input_file_name, master_current);							/*Check correct usage '-s'*/
 																					/*&&*/
-		return implement_scan(split, flag, &inptr, master_current);								/*Implementing it*/
+		return implement_scan(split, master_current);								/*Implementing it*/
 	/*-----------------------------------------------------------*/
 	}
 	else

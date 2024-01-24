@@ -1,4 +1,5 @@
 #include "csv.h"
+#include <time.h>
 
 int main(int argc, char *argv[])
 {
@@ -23,6 +24,8 @@ int main(int argc, char *argv[])
 		}
 		printf("\n");
 	}
-	free_input(csv.input, csv.output, array_count, buffer, &inptr);
+
+	call_free_functions(csv, buffer);
+
 	return 0;
 }
