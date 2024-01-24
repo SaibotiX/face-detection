@@ -7,34 +7,26 @@
 
 #include "functions.h"
 
-result csv_function(int argc, char *argv[])
-{
+result csv_function(int argc, char *argv[]) {
 	/* Global Variables */
-	buffer = NULL;
 	flag = initialize_flags();
 
 	/* Local Variables */
-	bool check_functionality = true;
-
 	char *input_file_name = NULL;
 	char *default_file_name = "document.csv";
 	
 	char master_current = 0;
 
 	int option_index = 0;
+	int slow_mode = 0;
 
 	splits split = initialize_split();
 	layout table;
 
 	while (1)
 	{
-		int c = getopt_long(argc, argv, "w::s:c:r:l::", long_options, &option_index);
+		int c = getopt_long(argc, argv, "w::s:c:r:l::h", long_options, &option_index);
 		
-		if (argc == 1)
-		{
-			check_functionality = false;
-		}
-
 		if(c == -1)
 		{
 			break;
@@ -75,7 +67,7 @@ result csv_function(int argc, char *argv[])
 				check_general_optarg(optarg, 'c');
 
 				if(master_current == 's') {
-					int *position_semicolons = track_semicolons();
+					int *position_semicolons = track_semicolons('c');
 					define_split(optarg, &split, 'c', position_semicolons);
 				}
 				else if(master_current == 'w') {
@@ -93,7 +85,7 @@ result csv_function(int argc, char *argv[])
 				check_general_optarg(optarg, 'r');
 
 				if(master_current == 's') {
-					int *position_semicolons = track_semicolons();
+					int *position_semicolons = track_semicolons('r');
 					define_split(optarg, &split, 'r', position_semicolons);
 				}
 				else if(master_current == 'w') {
@@ -101,9 +93,15 @@ result csv_function(int argc, char *argv[])
 				}
 				break;
 			}
+			case 'h':
+			{
+				print_error(20);
+			}
 			case 0:
 			{
 				/* Usage long name will get handled here */
+				/*       Not implemented right now       */
+				/*---------------------------------------*/
 				break;
 			}
 			case '?':
@@ -112,26 +110,21 @@ result csv_function(int argc, char *argv[])
 			}
 		}
 	}
-	if (check_functionality == true && argc >= 1)
-	{
-		excess_arguments(optind, argc);
-		check_split(split);
-		check_read_OR_write(flag);
-	/*-----------------------------------------------------------*/	
-		set_up_write(flag, input_file_name, default_file_name, master_current);		/*Check correct usage '-w'*/
-																					/*&&*/
-		implement_write(table, master_current);						/*Implementing it*/
-	/*-----------------------------------------------------------*/
-
-	/*-----------------------------------------------------------*/	
-		set_up_scan(flag, input_file_name, master_current);							/*Check correct usage '-s'*/
-																					/*&&*/
-		return implement_scan(split, master_current);								/*Implementing it*/
-	/*-----------------------------------------------------------*/
-	}
-	else
-	{
+	
+	if(argc == 1) {
 		print_error(69);
-		exit(1);
+	}
+	excess_arguments(optind, argc);
+	check_read_OR_write(flag);
+
+	if(master_current == 'w') {
+		set_up_write(flag, input_file_name, default_file_name, master_current);
+		implement_write(table, master_current);
+	}
+	else if(master_current == 's') {
+		check_split(split, &slow_mode);
+		set_up_scan(flag, input_file_name, master_current);
+		return implement_scan(split, master_current, slow_mode);
 	}
 }
+
