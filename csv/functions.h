@@ -470,7 +470,7 @@ void check_input_value(char * buffer, result csv)
 		call_free_functions(csv, buffer);
 		print_error(15);
 	}
-	else if(strlen(buffer) == 1)
+	else if(strlen(buffer) == 1 && !atof(buffer))
 	{
 		sprintf(buffer, "%i", buffer[0]);
 	}
